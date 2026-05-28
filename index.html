@@ -3,94 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수학동아리</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>수학동아리 신청 관리</title>
+    <!-- Firebase SDK 로드 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase 설정 (환경 변수 자동 연동)
-        const firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+        const firebaseConfig = {
+            apiKey: "AIzaSyDlkGukYR90Dq9pVBTceGITyr7ETxfJNvg",
+            authDomain: "math-club-application.firebaseapp.com",
+            projectId: "math-club-application",
+            storageBucket: "math-club-application.firebasestorage.app",
+            messagingSenderId: "73557118596",
+            appId: "1:73557118596:web:d0a78880eb590673627cd1",
+            measurementId: "G-3HJ652Z4EN"
+        };
+
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        // 데이터 경로 (보안 규칙의 경로와 일치해야 합니다)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'applications');
 
-        // 제출 로직
-        document.getElementById('applyForm').addEventListener('submit', async function(e) {
+        // 신청서 제출 이벤트
+        document.getElementById('applyForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const studentId = document.getElementById('studentId').value;
-            const name = document.getElementById('name').value;
-            const motivation = document.getElementById('motivation').value;
-            
             try {
-                // 중복 검사
-                const q = query(colRef, where("studentId", "==", studentId));
-                const snapshot = await getDocs(q);
-                
-                if (!snapshot.empty) {
-                    alert('이미 지원하신 학번입니다.');
-                    return;
-                }
-
-                // 저장
-                await addDoc(colRef, {
-                    name, studentId, motivation,
-                    timestamp: new Date().toLocaleString()
+                await addDoc(collection(db, "applications"), {
+                    school: document.getElementById('school').value,
+                    studentId: document.getElementById('studentId').value,
+                    name: document.getElementById('name').value,
+                    motivation: document.getElementById('motivation').value,
+                    timestamp: new Date()
                 });
-                alert('지원서가 성공적으로 제출되었습니다!');
-                this.reset();
-            } catch (error) {
-                console.error(error);
-                alert('제출 실패: 권한 설정을 확인하세요 (Firestore Rules)');
+                alert("신청이 완료되었습니다!");
+                document.getElementById('applyForm').reset();
+            } catch (e) {
+                alert("오류 발생: " + e.message);
             }
         });
 
-        // 관리자 모드 (엑셀 다운로드)
-        window.openAdmin = async () => {
-            const pw = prompt("관리자 비밀번호:");
-            if (pw !== "admin1234") return alert("비밀번호 불일치");
-            
+        // 엑셀 다운로드
+        window.downloadExcel = async () => {
             try {
-                const snapshot = await getDocs(colRef);
-                let csv = "성명,학번,지원동기,제출일시\n";
-                snapshot.forEach(doc => {
+                const querySnapshot = await getDocs(collection(db, "applications"));
+                let csv = "학교,학번,성명,지원동기\n";
+                querySnapshot.forEach((doc) => {
                     const d = doc.data();
-                    csv += `"${d.name}","${d.studentId}","${d.motivation}","${d.timestamp}"\n`;
+                    csv += `${d.school},${d.studentId},${d.name},"${d.motivation.replace(/"/g, '""')}"\n`;
                 });
-                
-                const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
+                const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
-                link.href = url;
-                link.download = "수학동아리_지원자목록.csv";
+                link.href = URL.createObjectURL(blob);
+                link.download = "신청명단.csv";
                 link.click();
-            } catch (e) { alert("데이터 로드 실패"); }
+            } catch (e) {
+                alert("데이터를 가져오는 중 오류가 발생했습니다: " + e.message);
+            }
         };
     </script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background-color: #f4f7f6; }
+        .form-card, .admin-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { text-align: center; color: #333; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        .admin-section { display: none; }
+    </style>
 </head>
-<body class="bg-slate-50">
-    <div class="max-w-4xl mx-auto p-6">
-        <nav class="text-right py-4">
-            <button onclick="openAdmin()" class="text-gray-400 hover:text-indigo-600">관리자 모드</button>
-        </nav>
-        
-        <header class="bg-indigo-700 text-white p-12 rounded-2xl text-center shadow-xl">
-            <h1 class="text-5xl font-bold mb-4">수학동아리</h1>
-            <p class="text-xl opacity-90">논리적 사고로 세상을 설계하는 즐거운 수학 여행</p>
-        </header>
+<body>
 
-        <section id="apply" class="mt-12 bg-white p-8 rounded-2xl shadow-lg">
-            <h2 class="text-2xl font-bold mb-6">입단 지원서</h2>
-            <form id="applyForm" class="space-y-4">
-                <input type="text" id="name" placeholder="성명" class="w-full p-3 border rounded-lg" required>
-                <input type="text" id="studentId" placeholder="학번 (예: 20101)" class="w-full p-3 border rounded-lg" required>
-                <textarea id="motivation" placeholder="지원 동기" class="w-full p-3 border rounded-lg" rows="4" required></textarea>
-                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg hover:bg-indigo-800">제출하기</button>
-            </form>
-        </section>
+    <div class="form-card" id="applySection">
+        <h2>수학동아리 신청</h2>
+        <form id="applyForm">
+            <div class="input-group"><label>학교</label><input type="text" id="school" required></div>
+            <div class="input-group"><label>학번</label><input type="text" id="studentId" required></div>
+            <div class="input-group"><label>성명</label><input type="text" id="name" required></div>
+            <div class="input-group"><label>지원동기</label><textarea id="motivation" required></textarea></div>
+            <button type="submit">신청 제출하기</button>
+        </form>
+    </div>
+
+    <button onclick="document.getElementById('adminSection').style.display='block'" style="background: #666; font-size: 12px; padding: 5px; border: none; color: white; cursor: pointer;">관리자 로그인</button>
+
+    <div class="admin-section" id="adminSection">
+        <div class="admin-card">
+            <h2>관리자 모드</h2>
+            <input type="password" id="adminPass" placeholder="관리자 비밀번호">
+            <button onclick="if(document.getElementById('adminPass').value==='1234') document.getElementById('adminControls').style.display='block'; else alert('비밀번호 오류');">로그인</button>
+            <div id="adminControls" style="display:none; margin-top:20px;">
+                <button onclick="downloadExcel()" style="background: #28a745;">엑셀(CSV)로 다운로드</button>
+            </div>
+        </div>
     </div>
 </body>
 </html>
